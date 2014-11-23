@@ -4,6 +4,7 @@ import akka.actor.{Cancellable, ActorRef, ActorLogging, Actor}
 import akka.event.LoggingReceive
 
 import scala.language.postfixOps
+import scalabcn.extensions.Counter
 import scalabcn.marsrover.MarsMap
 import scalabcn.marsrover.actors.MarsRover._
 
@@ -92,20 +93,25 @@ class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging {
       marsMap.moveRover(position)
 
       subscribers.foreach(sender => sender ! position)
+      Counter(context.system).count(Tick)
 
     case StopEngine =>
       log.info("ENGINE STOPPED")
       engine.cancel()
       marsMap.setRoverRunning(false)
       context.unbecome()
+      Counter(context.system).count(StopEngine)
 
     case TurnLeft =>
       direction = direction.left
       log.info(s"Turn left.. ${direction.toString}")
+      Counter(context.system).count(TurnLeft)
 
     case TurnRight =>
       direction = direction.right
       log.info(s"Turn right.. ${direction.toString}")
+      Counter(context.system).count(TurnRight)
+
   } orElse ops
 
   private def ops: Receive = LoggingReceive {
@@ -113,6 +119,7 @@ class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging {
       subscribers = sender :: subscribers
 
     case SelfDestruct =>
+      Counter(context.system).print()
       context.stop(self)
 
     case GetPosition =>
