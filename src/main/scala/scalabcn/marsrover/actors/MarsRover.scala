@@ -5,9 +5,7 @@ import akka.event.LoggingReceive
 import akka.persistence.{SaveSnapshotSuccess, RecoveryCompleted, SnapshotOffer, PersistentActor}
 
 import scala.language.postfixOps
-import scalabcn.extensions._
-import scalabcn.extensions.Counter
-import scalabcn.marsrover.MarsMap
+import scalabcn.extensions.{WaitForItExt, Counter, MarsMap}
 import scalabcn.marsrover.actors.MarsRover._
 
 case class Direction(val name: String, val x: Int, val y: Int) extends Serializable {
@@ -63,7 +61,7 @@ object MarsRover {
 
 case class SnapState(direction: Direction, position: Position)
 
-class MarsRover(marsMap: MarsMap) extends PersistentActor with ActorLogging with LatencyExt {
+class MarsRover(marsMap: MarsMap) extends PersistentActor with ActorLogging with WaitForItExt {
   var direction:Direction = NORTH
   var position: Position = new Position(0, 0, direction)
   var subscribers = List[ActorRef]()
@@ -129,7 +127,7 @@ class MarsRover(marsMap: MarsMap) extends PersistentActor with ActorLogging with
         position = position.move(direction)
 
         marsMap.moveRover(position)
-        Counter(context.system).count(Tick)
+        Counter(context.system).increment(Tick)
 
         subscribers.foreach(sender => sender ! position)
 
@@ -141,21 +139,20 @@ class MarsRover(marsMap: MarsMap) extends PersistentActor with ActorLogging with
       engine.cancel()
       marsMap.setRoverRunning(false)
       context.unbecome()
-      Counter(context.system).print()
 
       saveSnapshot(SnapState(direction, position))
 
     case TurnLeft =>
       persist(Event(Tick)) (e=> {
         direction = direction.left
-        Counter(context.system).count(TurnLeft)
+        Counter(context.system).increment(TurnLeft)
         log.info(s"Turn left.. ${direction.toString}")
       })
 
     case TurnRight =>
       persist(Event(TurnRight)) (e=> {
         direction = direction.right
-        Counter(context.system).count(TurnRight)
+        Counter(context.system).increment(TurnRight)
         log.info(s"Turn right.. ${direction.toString}")
       })
   } orElse ops

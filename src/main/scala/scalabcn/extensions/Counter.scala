@@ -1,49 +1,45 @@
 package scalabcn.extensions
 
 import akka.actor._
-
-import scala.collection.mutable
-import scalabcn.extensions.CounterActor.{Print, Count}
+import scala.collection._
 
 
-class Counter(system: ActorSystem) extends Extension {
-  val countActor = system.actorOf(Props[CounterActor])
+/**
+ * Created by pablo on 2/11/14.
+ */
+class CounterImpl(val system: ExtendedActorSystem) extends Extension {
+  val countActor = system.actorOf(Props(classOf[CounterActor]), "counter")
 
-  def count(msg: Any): Unit = {
-    countActor ! Count(msg)
+  def increment(msg: Any) = {
+    countActor ! msg.getClass
   }
 
-  def print() = {
-    countActor ! Print
+}
+
+// Counter ExtensionId, registers the actor and
+object Counter extends ExtensionId[CounterImpl] with ExtensionIdProvider {
+  override def lookup = Counter
+
+  override def createExtension(system: ExtendedActorSystem) = {
+    new CounterImpl(system)
   }
 }
 
-object Counter extends ExtensionId[Counter] with ExtensionIdProvider{
-  override def createExtension(system: ExtendedActorSystem) = new Counter(system)
-
-  override def lookup() = Counter
-}
-
-object CounterActor {
-  case class Count(msg: Any)
-  object Print
-
-}
 
 class CounterActor extends Actor with ActorLogging {
-  val countMap = mutable.Map[String, Int]()
+  val countMap = new mutable.HashMap[Any, Int]
 
-  override def receive: Receive = {
-    case Count(msg) =>
-      val clazz = msg.getClass.getSimpleName
-      val optCount = countMap.get(clazz)
-      val count = optCount.getOrElse(0)
+  override def receive:Receive = {
+    case x:Any =>
+      log.info(x.toString)
 
-      countMap.put(clazz, count+1)
+      val count = countMap.getOrElse(x, 0) + 1
 
-    case Print =>
-      countMap.foreach(pair=>log.info(pair.toString))
-
+      countMap += (x -> count)
   }
-}
 
+  override def postStop() {
+    println(countMap)
+  }
+
+}

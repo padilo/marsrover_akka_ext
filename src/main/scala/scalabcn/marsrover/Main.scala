@@ -4,6 +4,7 @@ import akka.actor._
 import akka.event.LoggingReceive
 
 import scala.util.Random
+import scalabcn.extensions.MarsMap
 import scalabcn.gui.Gui
 import scalabcn.marsrover.actors.Esa.StartMissionEsa
 import scalabcn.marsrover.actors.{Esa}

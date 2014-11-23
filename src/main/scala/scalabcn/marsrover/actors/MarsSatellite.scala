@@ -3,8 +3,7 @@ package scalabcn.marsrover.actors
 import akka.actor.{Terminated, Actor, ActorLogging, Props}
 import akka.event.LoggingReceive
 
-import scalabcn.extensions.LatencyExt
-import scalabcn.marsrover.MarsMap
+import scalabcn.extensions.{WaitForItExt, MarsMap}
 import scalabcn.marsrover.actors.MarsRover._
 import scalabcn.marsrover.actors.MarsSatellite.{AbortMission, SendLeft, SendRight, StartMission}
 
@@ -16,9 +15,10 @@ object MarsSatellite {
 
 }
 
-class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging with LatencyExt {
+class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging with WaitForItExt {
   val rover = context.actorOf(Props(classOf[MarsRover], marsMap), "mars-rover")
   context.watch(rover)
+  var lastId = 0
 
   override def receive = LoggingReceive {
     case StopEngine =>
@@ -40,6 +40,7 @@ class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging with Laten
     case pos:Position =>
       marsMap.moveSatellite(pos)
       context.parent ! pos
+      log.info(pos.toString)
 
     case GetPosition =>
       rover ! GetPosition
@@ -47,7 +48,8 @@ class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging with Laten
     case pos: RequestedPosition =>
       context.parent ! pos
 
-    case Terminated(_) =>
+    case Terminated(rover) =>
+      println("dying...")
       context.stop(self)
 
   }

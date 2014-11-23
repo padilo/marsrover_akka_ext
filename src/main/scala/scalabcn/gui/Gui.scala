@@ -4,7 +4,7 @@ import java.awt.Color
 import javax.swing.BorderFactory
 
 import scala.swing._
-import scalabcn.marsrover.{MarsListener, MarsMap}
+import scalabcn.extensions.{MarsMap, MarsListener}
 
 
 class Gui(mars: MarsMap) extends SimpleSwingApplication{
