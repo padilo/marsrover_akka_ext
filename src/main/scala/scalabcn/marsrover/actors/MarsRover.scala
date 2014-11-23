@@ -2,9 +2,11 @@ package scalabcn.marsrover.actors
 
 import akka.actor.{Cancellable, ActorRef, ActorLogging, Actor}
 import akka.event.LoggingReceive
+import akka.persistence.{SaveSnapshotSuccess, RecoveryCompleted, SnapshotOffer, PersistentActor}
 
 import scala.language.postfixOps
-import scalabcn.extensions.{LatencyExt, Counter}
+import scalabcn.extensions._
+import scalabcn.extensions.Counter
 import scalabcn.marsrover.MarsMap
 import scalabcn.marsrover.actors.MarsRover._
 
@@ -61,7 +63,7 @@ object MarsRover {
 
 case class SnapState(direction: Direction, position: Position)
 
-class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging with LatencyExt {
+class MarsRover(marsMap: MarsMap) extends PersistentActor with ActorLogging with LatencyExt {
   var direction:Direction = NORTH
   var position: Position = new Position(0, 0, direction)
   var subscribers = List[ActorRef]()
@@ -72,7 +74,42 @@ class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging with LatencyEx
   import scala.concurrent.ExecutionContext.Implicits.global
   import scala.concurrent.duration._
 
-  override def receive: Receive = analyzingEnv
+  override def persistenceId: String = "mars-rover"
+
+  override def receiveCommand: Receive = analyzingEnv
+
+  override def receiveRecover: Receive = {
+    case Event(StartEngine) =>
+      startEngine()
+    case Event(Tick) =>
+      position = position.move(direction)
+      marsMap.moveRover(position)
+    case Event(TurnLeft) =>
+      direction = direction.left
+    case Event(TurnRight) =>
+      direction = direction.right
+    case SnapshotOffer(metadata, SnapState(snapDirection, snapPosition)) =>
+      position = snapPosition
+      direction = snapDirection
+    case snap: SnapshotOffer =>
+      println(snap)
+      throw new RuntimeException
+    case RecoveryCompleted =>
+      marsMap.moveRover(position)
+  }
+
+  private def ops: Receive = LoggingReceive {
+    case Subscribe =>
+      subscribers = sender :: subscribers
+
+    case SelfDestruct =>
+      context.stop(self)
+
+    case GetPosition =>
+      sender ! RequestedPosition(position)
+
+    case SaveSnapshotSuccess(_) =>
+  }
 
   private def analyzingEnv:Receive = LoggingReceive {
     case StartEngine =>
@@ -88,43 +125,39 @@ class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging with LatencyEx
 
   private def running(engine:Cancellable):Receive = LoggingReceive {
     case Tick =>
-      position = position.move(direction)
+      persist(Event(Tick)) (e=> {
+        position = position.move(direction)
 
-      marsMap.moveRover(position)
+        marsMap.moveRover(position)
+        Counter(context.system).count(Tick)
 
-      subscribers.foreach(sender => sender ! position)
-      Counter(context.system).count(Tick)
+        subscribers.foreach(sender => sender ! position)
+
+        log.info(position.toString)
+      })
 
     case StopEngine =>
       log.info("ENGINE STOPPED")
       engine.cancel()
       marsMap.setRoverRunning(false)
       context.unbecome()
-      Counter(context.system).count(StopEngine)
+      Counter(context.system).print()
+
+      saveSnapshot(SnapState(direction, position))
 
     case TurnLeft =>
-      direction = direction.left
-      log.info(s"Turn left.. ${direction.toString}")
-      Counter(context.system).count(TurnLeft)
+      persist(Event(Tick)) (e=> {
+        direction = direction.left
+        Counter(context.system).count(TurnLeft)
+        log.info(s"Turn left.. ${direction.toString}")
+      })
 
     case TurnRight =>
-      direction = direction.right
-      log.info(s"Turn right.. ${direction.toString}")
-      Counter(context.system).count(TurnRight)
-
+      persist(Event(TurnRight)) (e=> {
+        direction = direction.right
+        Counter(context.system).count(TurnRight)
+        log.info(s"Turn right.. ${direction.toString}")
+      })
   } orElse ops
-
-  private def ops: Receive = LoggingReceive {
-    case Subscribe =>
-      subscribers = sender :: subscribers
-
-    case SelfDestruct =>
-      Counter(context.system).print()
-      context.stop(self)
-
-    case GetPosition =>
-      sender ! RequestedPosition(position)
-
-  }
 
 }
