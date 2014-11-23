@@ -9,8 +9,13 @@ import scalabcn.extensions.CounterActor.{Print, Count}
 class Counter(system: ActorSystem) extends Extension {
   val countActor = system.actorOf(Props[CounterActor])
 
-  def count(msg: Any) = countActor ! Count(msg)
-  def print() = countActor ! Print
+  def count(msg: Any): Unit = {
+    countActor ! Count(msg)
+  }
+
+  def print() = {
+    countActor ! Print
+  }
 }
 
 object Counter extends ExtensionId[Counter] with ExtensionIdProvider{
