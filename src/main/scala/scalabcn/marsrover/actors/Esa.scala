@@ -3,6 +3,7 @@ package scalabcn.marsrover.actors
 import akka.actor.{Actor, ActorLogging, Props, Terminated}
 import akka.event.LoggingReceive
 
+import scalabcn.extensions.LatencyExt
 import scalabcn.marsrover.MarsMap
 import scalabcn.marsrover.actors.Esa.StartMissionEsa
 import scalabcn.marsrover.actors.MarsRover.StopEngine
@@ -11,7 +12,7 @@ import scala.language.postfixOps
 
 case class TurnDistance(val distance:Int, val pos:Position, val takeDirection:()=>Unit)
 
-class Esa(marsMap: MarsMap) extends Actor with ActorLogging {
+class Esa(marsMap: MarsMap) extends Actor with ActorLogging with LatencyExt {
   val satellite = context.actorOf(Props(classOf[MarsSatellite], marsMap), "mars-satellite")
   context.watch(satellite)
 

@@ -3,6 +3,7 @@ package scalabcn.marsrover.actors
 import akka.actor.{Terminated, Actor, ActorLogging, Props}
 import akka.event.LoggingReceive
 
+import scalabcn.extensions.LatencyExt
 import scalabcn.marsrover.MarsMap
 import scalabcn.marsrover.actors.MarsRover._
 import scalabcn.marsrover.actors.MarsSatellite.{AbortMission, SendLeft, SendRight, StartMission}
@@ -15,7 +16,7 @@ object MarsSatellite {
 
 }
 
-class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging {
+class MarsSatellite(marsMap: MarsMap) extends Actor with ActorLogging with LatencyExt {
   val rover = context.actorOf(Props(classOf[MarsRover], marsMap), "mars-rover")
   context.watch(rover)
 

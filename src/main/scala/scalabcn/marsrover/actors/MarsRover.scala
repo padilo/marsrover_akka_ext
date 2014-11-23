@@ -4,7 +4,7 @@ import akka.actor.{Cancellable, ActorRef, ActorLogging, Actor}
 import akka.event.LoggingReceive
 
 import scala.language.postfixOps
-import scalabcn.extensions.Counter
+import scalabcn.extensions.{LatencyExt, Counter}
 import scalabcn.marsrover.MarsMap
 import scalabcn.marsrover.actors.MarsRover._
 
@@ -61,7 +61,7 @@ object MarsRover {
 
 case class SnapState(direction: Direction, position: Position)
 
-class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging {
+class MarsRover(marsMap: MarsMap) extends Actor with ActorLogging with LatencyExt {
   var direction:Direction = NORTH
   var position: Position = new Position(0, 0, direction)
   var subscribers = List[ActorRef]()
